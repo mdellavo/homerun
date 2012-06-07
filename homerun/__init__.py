@@ -10,13 +10,21 @@ def spawn(*args):
 # FIXME need a better name
 def spawn_lines(*args):
     p = subprocess.Popen(args, stdout=subprocess.PIPE)
-    return (i.strip() for i in p.stdout)
+    output = (i.strip() for i in p.stdout)
+    return (i for i in output if i)
 
 def hdhomerun_config(*args):
     return spawn('hdhomerun_config', *args)
 
 def hdhomerun_config_lines(*args):
     return spawn_lines('hdhomerun_config', *args)
+
+def kv_to_dict(s):
+    return dict(i.split('=') for i in s.split())
+
+def kvlist_to_dict(lines):
+    kv_lines = (line.split(':') for line in lines)
+    return dict((k, v.split()) for k,v in kv_lines)
 
 def check_hdhomerun_config():
     return bool(spawn('which', 'hdhomerun_config'))
@@ -36,8 +44,19 @@ def discover():
     }
 
 def get_value(device, option):
-    rv = hdhomerun_config(device, 'get', option)
-    return rv.strip() if rv else rv
+    value = hdhomerun_config(device, 'get', option)
+    return value.strip() if value else None
+
+def get_value_lines(device, option):
+    return hdhomerun_config_lines(device, 'get', option)
+
+def get_value_dict(device, option):
+    value = get_value(device, option)
+    return kv_to_dict(value) if value else None
+
+def get_value_dictlist(device, option):
+    value = get_value_lines(device, option)
+    return kvlist_to_dict(value) if value else None
 
 def set_value(device, option, value):
     return hdhomerun_config(device, 'set', option, value)
@@ -66,11 +85,12 @@ def scan(device, tuner):
             }
 
 def num_tuners(device):
-
     i = 0
+
     while True:
         if not get_value(device, '/tuner%d/status' % i):
             break
+
         i += 1
 
     return i
@@ -80,31 +100,19 @@ def get_tuner_names(device):
         yield 'tuner' % i
 
 def get_device_model(device):
-    return get_value('/sys/model')
+    return get_value(device, '/sys/model')
 
 def get_device_hwmodel(device):
-    return get_value('/sys/hwmodel')
+    return get_value(device, '/sys/hwmodel')
 
 def get_device_features(device):
-    features = hdhomerun_config_lines(device, 'get', '/sys/features')
-
-    if not features:
-        return None
-
-    rv = {}
-    for line in features:
-        if line:
-            key, rest = line.split(':')
-            rv[key] = rest.split()
-    return rv
+    return get_value_dictlist(device, '/sys/features')
 
 def get_device_version(device):
-    return get_value('/sys/version')
+    return get_value(device, '/sys/version')
 
 def get_card_status(device):
-    status = get_value(device, '/card/status')
+    return get_value_dict(device, '/card/status')
 
-    if not status:
-        return None
-
-    return dict(i.split('=') for i in status.split())
+def get_tuner_status(device, tuner):
+    return get_value_dict(device, '/tuner%d/status' % tuner)
