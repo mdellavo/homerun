@@ -80,7 +80,7 @@ def scan(device, tuner):
             yield {
                 'channel': channel,
                 'program': match.group(1),
-                'vct': match.group(2),
+                'number': match.group(2),
                 'name': name
             }
 
